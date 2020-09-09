@@ -21,11 +21,18 @@ type pulsarStore struct {
 
 // Note: If you need a more controlled init func, write your pulsar lib to implement the EventStore interface.
 func Init(opts bifrost.Options) (bifrost.EventStore, error) {
-	if strings.TrimSpace(opts.ServiceName) == "" {
+
+	addr := strings.TrimSpace(opts.Address)
+	if addr == "" {
+		return nil, bifrost.InvalidURLErr
+	}
+
+	name := strings.TrimSpace(opts.ServiceName)
+	if name == "" {
 		return nil, bifrost.EmptyStoreNameErr
 	}
 
-	clientOptions := pulsar.ClientOptions{URL: opts.Address}
+	clientOptions := pulsar.ClientOptions{URL: addr}
 
 	if opts.TLSCertificate != nil {
 		clientOptions.Authentication = pulsar.NewAuthenticationFromTLSCertSupplier(func() (*tls.Certificate, error) {
@@ -39,7 +46,7 @@ func Init(opts bifrost.Options) (bifrost.EventStore, error) {
 		log.Print("Unable to connect with Pulsar with provided configuration. Failed with error: ", err)
 		return nil, err
 	}
-	return &pulsarStore{client: p, serviceName: opts.ServiceName}, nil
+	return &pulsarStore{client: p, serviceName: name}, nil
 }
 
 func (s *pulsarStore) GetServiceName() string {
