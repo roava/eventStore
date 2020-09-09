@@ -97,9 +97,8 @@ func (s *pulsarStore) Subscribe(topic string, handler bifrost.SubscriptionHandle
 		return fmt.Errorf("error subscribing to topic. %v", err)
 	}
 
-	defer consumer.Close()
-
 	go func() {
+		defer consumer.Close()
 		for {
 			if val, ok := <-consumer.Chan(); ok {
 				event := NewEvent(val)
