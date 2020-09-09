@@ -97,18 +97,23 @@ func (s *pulsarStore) Subscribe(topic string, handler bifrost.SubscriptionHandle
 		return fmt.Errorf("error subscribing to topic. %v", err)
 	}
 
-	go func() {
-		defer consumer.Close()
-		for {
-			if val, ok := <-consumer.Chan(); ok {
-				event := NewEvent(val)
-				// TODO: Ensure event struct is according to the Roava Ecosystem.
-				go handler(event)
-				// TODO: Decide if we want to add something to stream this data to another place as backup.
-			}
+	defer consumer.Close()
+	for {
+		if val, ok := <-consumer.Chan(); ok {
+			event := NewEvent(val)
+			// TODO: Ensure event struct is according to the Roava Ecosystem.
+			go handler(event)
+			// TODO: Decide if we want to add something to stream this data to another place as backup.
 		}
-	}()
-	return nil
+	}
+}
+
+func (s *pulsarStore) Run(handlers... bifrost.EventHandler) {
+	stop := make(chan bool, 1)
+	for _, handler := range handlers {
+		go handler()
+	}
+	<- stop
 }
 
 func byteToHex(b []byte) string {
