@@ -56,10 +56,11 @@ func (s *pulsarStore) GetServiceName() string {
 
 func (s *pulsarStore) Publish(topic string, message []byte) error {
 	sn := s.GetServiceName()
-	topic_ := fmt.Sprintf("%s.%s", sn, topic) // eventRoot is: io.roava.serviceName, topic is whatever is passed.
+	// fqtn: Fully Qualified Topic Name
+	fqtn := fmt.Sprintf("%s.%s", sn, topic) // eventRoot is: io.roava.serviceName, topic is whatever is passed.
 
 	producer, err := s.client.CreateProducer(pulsar.ProducerOptions{
-		Topic: topic_,
+		Topic: fqtn,
 		Name:  sn,
 	})
 	if err != nil {
@@ -78,7 +79,7 @@ func (s *pulsarStore) Publish(topic string, message []byte) error {
 		return fmt.Errorf("failed to send message. %v", err)
 	}
 
-	log.Printf("Published message to %s id ==>> %s", topic_, byteToHex(id.Serialize()))
+	log.Printf("Published message to %s id ==>> %s", fqtn, byteToHex(id.Serialize()))
 	return nil
 }
 
