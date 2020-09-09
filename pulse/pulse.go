@@ -21,19 +21,17 @@ type pulsarStore struct {
 
 // Note: If you need a more controlled init func, write your pulsar lib to implement the EventStore interface.
 func Init(opts bifrost.Options) (bifrost.EventStore, error) {
-
 	addr := strings.TrimSpace(opts.Address)
 	if addr == "" {
-		return nil, bifrost.InvalidURLErr
+		return nil, bifrost.ErrInvalidURL
 	}
 
 	name := strings.TrimSpace(opts.ServiceName)
 	if name == "" {
-		return nil, bifrost.EmptyStoreNameErr
+		return nil, bifrost.ErrEmptyStoreName
 	}
 
 	clientOptions := pulsar.ClientOptions{URL: addr}
-
 	if opts.TLSCertificate != nil {
 		clientOptions.Authentication = pulsar.NewAuthenticationFromTLSCertSupplier(func() (*tls.Certificate, error) {
 			// TODO: Really test connecting via Certificates & TLS conf.
@@ -43,10 +41,13 @@ func Init(opts bifrost.Options) (bifrost.EventStore, error) {
 
 	p, err := pulsar.NewClient(clientOptions)
 	if err != nil {
-		log.Print("Unable to connect with Pulsar with provided configuration. Failed with error: ", err)
-		return nil, err
+		return nil, fmt.Errorf("unable to connect with Pulsar with provided configuration. failed with error: %v", err)
 	}
 	return &pulsarStore{client: p, serviceName: name}, nil
+}
+
+func InitTestEventStore(mockClient pulsar.Client, serviceName string) (bifrost.EventStore, error) {
+	return &pulsarStore{client: mockClient, serviceName: serviceName}, nil
 }
 
 func (s *pulsarStore) GetServiceName() string {
@@ -55,31 +56,30 @@ func (s *pulsarStore) GetServiceName() string {
 
 func (s *pulsarStore) Publish(topic string, message []byte) error {
 	sn := s.GetServiceName()
-	__topic__ := fmt.Sprintf("%s.%s", sn, topic) // eventRoot is: io.roava.serviceName, topic is whatever is passed.
+	// fqtn: Fully Qualified Topic Name
+	fqtn := fmt.Sprintf("%s.%s", sn, topic) // eventRoot is: io.roava.serviceName, topic is whatever is passed.
 
 	producer, err := s.client.CreateProducer(pulsar.ProducerOptions{
-		Topic: __topic__,
+		Topic: fqtn,
 		Name:  sn,
 	})
 	if err != nil {
-		log.Println("Failed to create new producer with the following error", err)
-		return err
+		return fmt.Errorf("failed to create new producer with the following error: %v", err)
 	}
 	// Always close producer after successful production of packets so as not to get the error of
 	// ProducerBusy from pulsar.
 	defer producer.Close()
 
-	id, e := producer.Send(context.Background(), &pulsar.ProducerMessage{
+	id, err := producer.Send(context.Background(), &pulsar.ProducerMessage{
 		Payload:   message,
 		EventTime: time.Now(),
 	})
 
-	if e != nil {
-		log.Println(e, " Failed to send message.")
-		return e
+	if err != nil {
+		return fmt.Errorf("failed to send message. %v", err)
 	}
 
-	log.Printf("Published message to %s id ==>> %s", __topic__, byteToHex(id.Serialize()))
+	log.Printf("Published message to %s id ==>> %s", fqtn, byteToHex(id.Serialize()))
 	return nil
 }
 
@@ -95,10 +95,10 @@ func (s *pulsarStore) Subscribe(topic string, handler bifrost.SubscriptionHandle
 		Name:                        serviceName,
 	})
 	if err != nil {
-		fmt.Print(err, " Subscribing to unknown topic.")
-		return err
+		return fmt.Errorf("error subscribing to topic. %v", err)
 	}
 
+	defer consumer.Close()
 	for {
 		if val, ok := <-consumer.Chan(); ok {
 			event := NewEvent(val)
@@ -107,6 +107,14 @@ func (s *pulsarStore) Subscribe(topic string, handler bifrost.SubscriptionHandle
 			// TODO: Decide if we want to add something to stream this data to another place as backup.
 		}
 	}
+}
+
+func (s *pulsarStore) Run(handlers... bifrost.EventHandler) {
+	stop := make(chan bool, 1)
+	for _, handler := range handlers {
+		go handler()
+	}
+	<- stop
 }
 
 func byteToHex(b []byte) string {
