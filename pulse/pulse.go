@@ -78,7 +78,7 @@ func (s *pulsarStore) Publish(topic string, message []byte) error {
 		return fmt.Errorf("failed to send message. %v", err)
 	}
 
-	log.Printf("Published message to %s id ==>> %s", topic, byteToHex(id.Serialize()))
+	log.Printf("Published message to %s id ==>> %s", topic_, byteToHex(id.Serialize()))
 	return nil
 }
 
