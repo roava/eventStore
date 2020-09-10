@@ -25,7 +25,7 @@ type consumerWrapper struct {
 	consumer pulsar.Consumer
 }
 
-func (c *consumerWrapper) Recv(ctx context.Context) (pulsar.Message, error) {
+func (c *consumerWrapper) Recv(ctx context.Context) (bifrost.Message, error) {
 	return c.consumer.Receive(ctx)
 }
 

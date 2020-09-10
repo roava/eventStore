@@ -30,7 +30,7 @@ type Message interface {
 }
 
 type Consumer interface {
-	Recv(ctx context.Context) (pulsar.Message, error)
+	Recv(ctx context.Context) (Message, error)
 	Ack(pulsar.MessageID)
 	Close()
 }
