@@ -10,12 +10,11 @@ import (
 	"github.com/roava/bifrost"
 	"log"
 	"strings"
-	"time"
 )
 
 type pulsarStore struct {
 	serviceName string
-	client      pulsar.Client
+	client      bifrost.Client
 	opts        bifrost.Options
 }
 
@@ -43,10 +42,10 @@ func Init(opts bifrost.Options) (bifrost.EventStore, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect with Pulsar with provided configuration. failed with error: %v", err)
 	}
-	return &pulsarStore{client: p, serviceName: name}, nil
+	return &pulsarStore{client: newClientWrapper(p), serviceName: name}, nil
 }
 
-func InitTestEventStore(mockClient pulsar.Client, serviceName string) (bifrost.EventStore, error) {
+func InitTestEventStore(mockClient bifrost.Client, serviceName string) (bifrost.EventStore, error) {
 	return &pulsarStore{client: mockClient, serviceName: serviceName}, nil
 }
 
@@ -70,11 +69,7 @@ func (s *pulsarStore) Publish(topic string, message []byte) error {
 	// ProducerBusy from pulsar.
 	defer producer.Close()
 
-	id, err := producer.Send(context.Background(), &pulsar.ProducerMessage{
-		Payload:   message,
-		EventTime: time.Now(),
-	})
-
+	id, err := producer.Send(context.Background(), message)
 	if err != nil {
 		return fmt.Errorf("failed to send message. %v", err)
 	}
@@ -100,21 +95,30 @@ func (s *pulsarStore) Subscribe(topic string, handler bifrost.SubscriptionHandle
 
 	defer consumer.Close()
 	for {
-		if val, ok := <-consumer.Chan(); ok {
-			event := NewEvent(val)
-			// TODO: Ensure event struct is according to the Roava Ecosystem.
-			go handler(event)
-			// TODO: Decide if we want to add something to stream this data to another place as backup.
+		message, err := consumer.Recv(context.Background())
+		if err == bifrost.ErrCloseConn {
+			break
 		}
+		if err != nil {
+			continue
+		}
+
+		event := NewEvent(message, consumer)
+		go handler(event)
 	}
+	return nil
 }
 
-func (s *pulsarStore) Run(handlers... bifrost.EventHandler) {
-	stop := make(chan bool, 1)
+func (s *pulsarStore) Run(ctx context.Context, handlers ...bifrost.EventHandler) {
 	for _, handler := range handlers {
 		go handler()
 	}
-	<- stop
+	for  {
+		select {
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 func byteToHex(b []byte) string {

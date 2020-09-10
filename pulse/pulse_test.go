@@ -1,6 +1,7 @@
 package pulse
 
 import (
+	"context"
 	"github.com/roava/bifrost"
 	"testing"
 	"time"
@@ -40,4 +41,31 @@ func TestStore_Subscribe(t *testing.T) {
 	})
 
 	defer timer.Stop()
+}
+
+func TestPulsarStore_Run(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	store, _ := InitTestEventStore(nil, "svc")
+
+	now := time.Now()
+	// cancel after 3secs
+	time.AfterFunc(3 * time.Second, func() {
+		t.Log("cancelling...")
+		cancel()
+	})
+	store.Run(ctx, func() {
+		t.Log("first function")
+	}, func() { t.Log("second function ")})
+	interval := time.Now().Sub(now)
+	if interval.Seconds() < 3 {
+		t.Fail()
+	}
+}
+
+func TestConsumerWrapper_Recv(t *testing.T) {
+
+}
+
+type mockConsumer struct {
+
 }
