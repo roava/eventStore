@@ -61,11 +61,3 @@ func TestPulsarStore_Run(t *testing.T) {
 		t.Fail()
 	}
 }
-
-func TestConsumerWrapper_Recv(t *testing.T) {
-
-}
-
-type mockConsumer struct {
-
-}

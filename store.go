@@ -7,7 +7,7 @@ import (
 )
 
 type SubscriptionHandler func(event Event)
-type EventHandler func()
+type EventHandler func() error
 
 var (
 	ErrEmptyStoreName          = errors.New("Sorry, you must provide a valid store name")
