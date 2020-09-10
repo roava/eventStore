@@ -5,7 +5,7 @@ import (
 )
 
 type Options struct {
-	ServiceName string
-	Address   string
+	ServiceName    string
+	Address        string
 	TLSCertificate *tls.Certificate
 }
