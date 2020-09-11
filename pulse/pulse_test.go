@@ -53,11 +53,18 @@ func TestPulsarStore_Run(t *testing.T) {
 		t.Log("cancelling...")
 		cancel()
 	})
-	store.Run(ctx, func() {
+	store.Run(ctx, func() error {
 		t.Log("first function")
-	}, func() { t.Log("second function ")})
+		return nil
+	}, func() error { t.Log("second function ")
+		return nil
+	})
 	interval := time.Now().Sub(now)
 	if interval.Seconds() < 3 {
 		t.Fail()
 	}
+}
+
+func Test_generateRandomName(t *testing.T) {
+	t.Log(generateRandomName())
 }

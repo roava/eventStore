@@ -9,6 +9,7 @@ import (
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/roava/bifrost"
 	"log"
+	"math/rand"
 	"strings"
 )
 
@@ -85,7 +86,7 @@ func (s *pulsarStore) Subscribe(topic string, handler bifrost.SubscriptionHandle
 	consumer, err := s.client.Subscribe(pulsar.ConsumerOptions{
 		Topic:                       topic,
 		AutoDiscoveryPeriod:         0,
-		SubscriptionName:            serviceName,
+		SubscriptionName:            fmt.Sprintf("subscription-%s", generateRandomName()),
 		Type:                        pulsar.Exclusive,
 		SubscriptionInitialPosition: pulsar.SubscriptionPositionLatest,
 		Name:                        serviceName,
@@ -130,4 +131,13 @@ func byteToHex(b []byte) string {
 	var out struct{}
 	_ = json.Unmarshal(b, &out)
 	return hex.EncodeToString(b)
+}
+
+func generateRandomName() string {
+	chars := "abcdefghijklmnopqrstuvwxyz"
+	bytes := make([]byte, 10)
+	for i := range bytes {
+		bytes[i] = chars[rand.Intn(len(chars))]
+	}
+	return string(bytes)
 }
