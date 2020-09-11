@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/apache/pulsar-client-go/pulsar"
-	"github.com/google/uuid"
 	"github.com/roava/bifrost"
 	"log"
 	"strings"
@@ -86,7 +85,7 @@ func (s *pulsarStore) Subscribe(topic string, handler bifrost.SubscriptionHandle
 	consumer, err := s.client.Subscribe(pulsar.ConsumerOptions{
 		Topic:                       topic,
 		AutoDiscoveryPeriod:         0,
-		SubscriptionName:            uuid.New().String(),
+		SubscriptionName:            serviceName,
 		Type:                        pulsar.Exclusive,
 		SubscriptionInitialPosition: pulsar.SubscriptionPositionLatest,
 		Name:                        serviceName,
