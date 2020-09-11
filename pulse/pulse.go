@@ -11,6 +11,7 @@ import (
 	"log"
 	"math/rand"
 	"strings"
+	"time"
 )
 
 type pulsarStore struct {
@@ -39,6 +40,7 @@ func Init(opts bifrost.Options) (bifrost.EventStore, error) {
 		})
 	}
 
+	rand.Seed(time.Now().UnixNano())
 	p, err := pulsar.NewClient(clientOptions)
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect with Pulsar with provided configuration. failed with error: %v", err)
