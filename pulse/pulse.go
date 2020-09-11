@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/apache/pulsar-client-go/pulsar"
+	"github.com/google/uuid"
 	"github.com/roava/bifrost"
 	"log"
 	"strings"
@@ -85,8 +86,8 @@ func (s *pulsarStore) Subscribe(topic string, handler bifrost.SubscriptionHandle
 	consumer, err := s.client.Subscribe(pulsar.ConsumerOptions{
 		Topic:                       topic,
 		AutoDiscoveryPeriod:         0,
-		SubscriptionName:            serviceName,
-		Type:                        pulsar.Shared,
+		SubscriptionName:            uuid.New().String(),
+		Type:                        pulsar.Exclusive,
 		SubscriptionInitialPosition: pulsar.SubscriptionPositionLatest,
 		Name:                        serviceName,
 	})
@@ -112,7 +113,11 @@ func (s *pulsarStore) Subscribe(topic string, handler bifrost.SubscriptionHandle
 
 func (s *pulsarStore) Run(ctx context.Context, handlers ...bifrost.EventHandler) {
 	for _, handler := range handlers {
-		go handler()
+		go func() {
+			if err := handler(); err != nil {
+				log.Printf("consumer returned with error: %v", err)
+			}
+		}()
 	}
 	for  {
 		select {
