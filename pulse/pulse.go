@@ -61,9 +61,11 @@ func (s *pulsarStore) Publish(topic string, message []byte) error {
 	// topic is whatever is passed eg: application.started
 	sn := s.GetServiceName()
 	// fqtn: Fully Qualified Topic Name eg: io.roava.kyc.application.started
-	fqtn := fmt.Sprintf("%s.%s", sn, topic)
+	// fqtn := fmt.Sprintf("%s.%s", sn, topic)
+	// TODO: compute FQTN. We need to think of a way to form topicName. So that we don't confuse Consumers
+	// TODO: also, i think it makes sense to delegate topic naming to the calling services.
 	producer, err := s.client.CreateProducer(pulsar.ProducerOptions{
-		Topic: fqtn,
+		Topic: topic,
 		Name:  sn,
 	})
 	if err != nil {
@@ -78,7 +80,7 @@ func (s *pulsarStore) Publish(topic string, message []byte) error {
 		return fmt.Errorf("failed to send message. %v", err)
 	}
 
-	log.Printf("Published message to %s id ==>> %s", fqtn, byteToHex(id.Serialize()))
+	log.Printf("Published message to %s id ==>> %s", topic, byteToHex(id.Serialize()))
 	return nil
 }
 

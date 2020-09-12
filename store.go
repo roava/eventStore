@@ -60,4 +60,3 @@ func (f EventHandler) Run() {
 		}
 	}
 }
-
