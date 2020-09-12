@@ -57,13 +57,16 @@ func (s *pulsarStore) GetServiceName() string {
 }
 
 func (s *pulsarStore) Publish(topic string, message []byte) error {
+	// sn here is the topic root prefix eg: is: io.roava.kyc
 	sn := s.GetServiceName()
-	// fqtn: Fully Qualified Topic Name
-	// fqtn := fmt.Sprintf("%s.%s", sn, topic) // eventRoot is: io.roava.serviceName, topic is whatever is passed.
+	// topic is whatever is passed eg: application.started
+
+	// fqtn: Fully Qualified Topic Name eg: io.roava.kyc.application.started
+	fqtn := fmt.Sprintf("%s.%s", sn, topic)
 	// TODO: compute topic name across Producer and Consumer
 
 	producer, err := s.client.CreateProducer(pulsar.ProducerOptions{
-		Topic: topic,
+		Topic: fqtn,
 		Name:  sn,
 	})
 	if err != nil {
@@ -78,7 +81,7 @@ func (s *pulsarStore) Publish(topic string, message []byte) error {
 		return fmt.Errorf("failed to send message. %v", err)
 	}
 
-	log.Printf("Published message to %s id ==>> %s", topic, byteToHex(id.Serialize()))
+	log.Printf("Published message to %s id ==>> %s", fqtn, byteToHex(id.Serialize()))
 	return nil
 }
 
