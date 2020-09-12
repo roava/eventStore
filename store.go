@@ -4,6 +4,8 @@ import (
 	"context"
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/pkg/errors"
+	"log"
+	"time"
 )
 
 type SubscriptionHandler func(event Event)
@@ -46,5 +48,16 @@ type Client interface {
 	CreateReader(pulsar.ReaderOptions) (pulsar.Reader, error)
 	TopicPartitions(string) ([]string, error)
 	Close()
+}
+
+func (f EventHandler) Run() {
+	for {
+		err := f()
+		if err != nil {
+			log.Printf("creating a consumer returned error: %v. Reconnecting in 3secs...", err)
+			time.Sleep(3 * time.Second)
+			continue
+		}
+	}
 }
 

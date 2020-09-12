@@ -115,11 +115,7 @@ func (s *pulsarStore) Subscribe(topic string, handler bifrost.SubscriptionHandle
 
 func (s *pulsarStore) Run(ctx context.Context, handlers ...bifrost.EventHandler) {
 	for _, handler := range handlers {
-		go func() {
-			if err := handler(); err != nil {
-				log.Printf("consumer returned with error: %v", err)
-			}
-		}()
+		go handler.Run()
 	}
 	for  {
 		select {
