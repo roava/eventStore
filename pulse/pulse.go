@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/roava/bifrost"
@@ -126,7 +127,7 @@ func (s *pulsarStore) Run(ctx context.Context, handlers ...bifrost.EventHandler)
 	for _, handler := range handlers {
 		go handler.Run()
 	}
-	for  {
+	for {
 		select {
 		case <-ctx.Done():
 			return
@@ -150,6 +151,10 @@ func generateRandomName() string {
 }
 
 func initCert(content string) (string, error) {
+	if len(content) == 0 {
+		return "", errors.New("cert content is empty")
+	}
+
 	pwd, err := os.Getwd()
 	if err != nil {
 		return "", err

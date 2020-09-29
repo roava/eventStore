@@ -15,7 +15,7 @@ var (
 	ErrEmptyStoreName          = errors.New("Sorry, you must provide a valid store name")
 	ErrInvalidURL              = errors.New("Sorry, you must provide a valid store URL")
 	ErrInvalidTlsConfiguration = errors.New("Sorry, you have provided an invalid tls configuration")
-	ErrCloseConn = errors.New("connection closed")
+	ErrCloseConn               = errors.New("connection closed")
 )
 
 type EventStore interface {

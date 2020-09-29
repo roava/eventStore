@@ -14,8 +14,7 @@ var store, _ = Init(bifrost.Options{
 	Address:     "pulsar://localhost:6650",
 })
 
-const cert =
-	`-----BEGIN CERTIFICATE-----
+const cert = `-----BEGIN CERTIFICATE-----
 MIIDQDCCAiigAwIBAgIQFmNdB6eBqmhjHzmFqeOHqDANBgkqhkiG9w0BAQsFADA6
 MRUwEwYDVQQKEwxjZXJ0LW1hbmFnZXIxITAfBgNVBAMTGHB1bHNhci5zdmMuY2x1
 c3Rlci5sb2NhbDAeFw0yMDA5MjgxMDEwMDdaFw0yMDEyMjcxMDEwMDdaMDoxFTAT
@@ -39,9 +38,9 @@ cNomZDoquhKWaSpVP/zk8vuQsVOMAy28BG0JBHFqTyCdS5+05oAZievjJGh2EaYX
 func TestInit(t *testing.T) {
 	addrs := "pulsar+ssl://pulsar.roava.io:6651"
 	opts := bifrost.Options{
-		ServiceName:           "test-service",
-		Address:               addrs,
-		CertContent: cert,
+		ServiceName:         "test-service",
+		Address:             addrs,
+		CertContent:         cert,
 		AuthenticationToken: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiJ9.vGEsDKZNolLbP7PWlhzzAZMaO4MrsswkDf9eMb6S8ME",
 	}
 	store, err := Init(opts)
@@ -100,14 +99,15 @@ func TestPulsarStore_Run(t *testing.T) {
 
 	now := time.Now()
 	// cancel after 3secs
-	time.AfterFunc(3 * time.Second, func() {
+	time.AfterFunc(3*time.Second, func() {
 		t.Log("cancelling...")
 		cancel()
 	})
 	store.Run(ctx, func() error {
 		t.Log("first function")
 		return nil
-	}, func() error { t.Log("second function ")
+	}, func() error {
+		t.Log("second function ")
 		return nil
 	})
 	interval := time.Now().Sub(now)
