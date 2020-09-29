@@ -2,14 +2,16 @@ package pulse
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/roava/bifrost"
+	"io/ioutil"
 	"log"
 	"math/rand"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -33,11 +35,16 @@ func Init(opts bifrost.Options) (bifrost.EventStore, error) {
 	}
 
 	clientOptions := pulsar.ClientOptions{URL: addr}
-	if opts.TLSCertificate != nil {
-		clientOptions.Authentication = pulsar.NewAuthenticationFromTLSCertSupplier(func() (*tls.Certificate, error) {
-			// TODO: Really test connecting via Certificates & TLS conf.
-			return opts.TLSCertificate, nil
-		})
+	if opts.CertContent != "" {
+		certPath, err := initCert(opts.CertContent)
+		if err != nil {
+			return nil, err
+		}
+		clientOptions.TLSAllowInsecureConnection = true
+		clientOptions.TLSTrustCertsFilePath = certPath
+	}
+	if opts.AuthenticationToken != "" {
+		clientOptions.Authentication = pulsar.NewAuthenticationToken(opts.AuthenticationToken)
 	}
 
 	rand.Seed(time.Now().UnixNano())
@@ -140,4 +147,16 @@ func generateRandomName() string {
 		bytes[i] = chars[rand.Intn(len(chars))]
 	}
 	return string(bytes)
+}
+
+func initCert(content string) (string, error) {
+	pwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	certPath := filepath.Join(pwd, "tls.crt")
+	if err := ioutil.WriteFile(certPath, []byte(content), os.ModePerm); err != nil {
+		return "", err
+	}
+	return certPath, nil
 }
