@@ -74,7 +74,7 @@ func (s *pulsarStore) Publish(topic string, message []byte) error {
 	// TODO: also, i think it makes sense to delegate topic naming to the calling services.
 	producer, err := s.client.CreateProducer(pulsar.ProducerOptions{
 		Topic: topic,
-		Name:  sn,
+		Name:  fmt.Sprintf("%s-producer-%s", sn, generateRandomName()), // the servicename-producer-randomstring
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create new producer with the following error: %v", err)
