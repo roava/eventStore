@@ -8,8 +8,9 @@ import (
 	"fmt"
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/roava/bifrost"
+	"github.com/roava/bifrost/platform"
+	"github.com/sirupsen/logrus"
 	"io/ioutil"
-	"log"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -19,11 +20,16 @@ import (
 
 type pulsarStore struct {
 	serviceName string
-	client      bifrost.Client
+	client      pulsar.Client
 	opts        bifrost.Options
+	logger      *logrus.Logger
+	debug       bool
+
+	// the below values are only useful for testing
+	testMode bool
+	ch       chan []byte
 }
 
-// Note: If you need a more controlled init func, write your pulsar lib to implement the EventStore interface.
 func Init(opts bifrost.Options) (bifrost.EventStore, error) {
 	addr := strings.TrimSpace(opts.Address)
 	if addr == "" {
@@ -51,13 +57,16 @@ func Init(opts bifrost.Options) (bifrost.EventStore, error) {
 	rand.Seed(time.Now().UnixNano())
 	p, err := pulsar.NewClient(clientOptions)
 	if err != nil {
-		return nil, fmt.Errorf("unable to connect with Pulsar with provided configuration. failed with error: %v", err)
+		return nil, fmt.Errorf("unable to connect to Pulsar with provided configuration. failed with error: %v", err)
 	}
-	return &pulsarStore{client: newClientWrapper(p), serviceName: name}, nil
+	lg := logrus.New()
+	lg.SetFormatter(&logrus.JSONFormatter{})
+	return &pulsarStore{client: p, serviceName: name, logger: lg, testMode: false, debug: opts.Debug}, nil
 }
 
-func InitTestEventStore(mockClient bifrost.Client, serviceName string) (bifrost.EventStore, error) {
-	return &pulsarStore{client: mockClient, serviceName: serviceName}, nil
+func InitTestEventStore(serviceName string, logger *logrus.Logger) (bifrost.EventStore, error) {
+	return &pulsarStore{serviceName: serviceName, testMode: true,
+		ch: make(chan []byte, 1), logger: logger}, nil
 }
 
 func (s *pulsarStore) GetServiceName() string {
@@ -65,9 +74,14 @@ func (s *pulsarStore) GetServiceName() string {
 }
 
 func (s *pulsarStore) Publish(topic string, message []byte) error {
+	if s.testMode {
+		s.logger.Info("pushing message into test channel")
+		s.ch <- message
+		return nil
+	}
 	// sn here is the topic root prefix eg: is: io.roava.kyc
 	// topic is whatever is passed eg: application.started
-	sn := s.GetServiceName()
+	sn := s.serviceName
 	// fqtn: Fully Qualified Topic Name eg: io.roava.kyc.application.started
 	// fqtn := fmt.Sprintf("%s.%s", sn, topic)
 	// TODO: compute FQTN. We need to think of a way to form topicName. So that we don't confuse Consumers
@@ -83,17 +97,39 @@ func (s *pulsarStore) Publish(topic string, message []byte) error {
 	// ProducerBusy from pulsar.
 	defer producer.Close()
 
-	id, err := producer.Send(context.Background(), message)
+	id, err := producer.Send(context.Background(), &pulsar.ProducerMessage{
+		Payload: message, EventTime: time.Now(),
+	})
 	if err != nil {
 		return fmt.Errorf("failed to send message. %v", err)
 	}
-
-	log.Printf("Published message to %s id ==>> %s", topic, byteToHex(id.Serialize()))
+	if s.debug {
+		s.logger.WithFields(logrus.Fields{
+			"topic":          topic,
+			"message_hex_id": byteToHex(id.Serialize()),
+		}).Info("message published")
+	}
 	return nil
 }
 
-// Manually put the fqdn of your topics.
 func (s *pulsarStore) Subscribe(topic string, handler bifrost.SubscriptionHandler) error {
+	if s.testMode {
+		for {
+			select {
+			case msg, ok := <-s.ch:
+				if ok {
+					s.logger.WithField("data", string(msg)).Info("recv message in test mode")
+					// consumer in platform can be nil, we don't use it because we don't ack test event
+					ev := platform.NewEvent(platform.NewPlatformMessage(pulsar.LatestMessageID(), topic,
+						msg), nil)
+					go handler(ev)
+				}
+			default:
+				return nil
+			}
+		}
+	}
+
 	serviceName := s.GetServiceName()
 	consumer, err := s.client.Subscribe(pulsar.ConsumerOptions{
 		Topic:                       topic,
@@ -109,18 +145,22 @@ func (s *pulsarStore) Subscribe(topic string, handler bifrost.SubscriptionHandle
 
 	defer consumer.Close()
 	for {
-		message, err := consumer.Recv(context.Background())
-		if err == bifrost.ErrCloseConn {
-			break
+		select {
+		case cm, ok := <-consumer.Chan():
+			if !ok {
+				return bifrost.ErrCloseConn
+			}
+			if s.debug {
+				s.logger.WithFields(logrus.Fields{
+					"data":  string(cm.Payload()),
+					"topic": cm.Topic(),
+				}).Info("new event received")
+			}
+			event := platform.NewEvent(cm, cm)
+			go handler(event)
+		default:
 		}
-		if err != nil {
-			continue
-		}
-
-		event := NewEvent(message, consumer)
-		go handler(event)
 	}
-	return nil
 }
 
 func (s *pulsarStore) Run(ctx context.Context, handlers ...bifrost.EventHandler) {
@@ -133,6 +173,29 @@ func (s *pulsarStore) Run(ctx context.Context, handlers ...bifrost.EventHandler)
 			return
 		}
 	}
+}
+
+func (s *pulsarStore) PublishRaw(topic string, messages ...interface{}) error {
+	if len(messages) == 0 {
+		return errors.New("invalid message size")
+	}
+	if s.testMode {
+		s.ch = make(chan []byte, len(messages))
+	}
+	for idx, message := range messages {
+		data, err := json.Marshal(message)
+		if err != nil {
+			return err
+		}
+		if s.debug {
+			s.logger.WithField("index", idx).Info("publishing message")
+		}
+		err = s.Publish(topic, data)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func byteToHex(b []byte) string {

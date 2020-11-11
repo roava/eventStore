@@ -4,24 +4,24 @@ import (
 	"context"
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/pkg/errors"
+	"github.com/roava/bifrost/platform"
 	"log"
 	"time"
 )
 
-type SubscriptionHandler func(event Event)
+type SubscriptionHandler func(event platform.Event)
 type EventHandler func() error
 
 var (
-	ErrEmptyStoreName          = errors.New("Sorry, you must provide a valid store name")
-	ErrInvalidURL              = errors.New("Sorry, you must provide a valid store URL")
-	ErrInvalidTlsConfiguration = errors.New("Sorry, you have provided an invalid tls configuration")
-	ErrCloseConn               = errors.New("connection closed")
+	ErrEmptyStoreName = errors.New("you must provide a valid store name")
+	ErrInvalidURL     = errors.New("you must provide a valid store URL")
+	ErrCloseConn      = errors.New("connection closed")
 )
 
 type EventStore interface {
 	Publish(topic string, message []byte) error
+	PublishRaw(topic string, message ...interface{}) error
 	Subscribe(topic string, handler SubscriptionHandler) error
-	GetServiceName() string
 	Run(ctx context.Context, handlers ...EventHandler)
 }
 

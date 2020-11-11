@@ -1,15 +1,16 @@
 package pulse
 
 import (
+	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/roava/bifrost"
 )
 
 type event struct {
-	raw      bifrost.Message
-	consumer bifrost.Consumer
+	raw      pulsar.Message
+	consumer pulsar.Consumer
 }
 
-func NewEvent(message bifrost.Message, consumer bifrost.Consumer) bifrost.Event {
+func NewEvent(message pulsar.Message, consumer pulsar.Consumer) bifrost.Event {
 	return &event{raw: message, consumer: consumer}
 }
 
@@ -24,5 +25,5 @@ func (e *event) Topic() string {
 }
 
 func (e *event) Ack() {
-	e.consumer.Ack(e.raw.ID())
+	e.consumer.AckID(e.raw.ID())
 }
