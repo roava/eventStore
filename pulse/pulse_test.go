@@ -42,6 +42,7 @@ func TestInit(t *testing.T) {
 			assert.NotNil(t, data)
 			assert.Equal(t, value.Message, "Hello, World!")
 			t.Log(event.Topic())
+			t.Log(value.Message)
 			c <- struct{}{}
 			event.Ack()
 		})
@@ -87,10 +88,7 @@ func TestIntegration(t *testing.T) {
 		Message string `json:"message"`
 	}
 	h := &eventHandler{bf: bf}
-	err = bf.PublishRaw("test-topic",
-		&e{Message: "Yello"}, &e{Message: "Jello"}, &e{Message: "Mello"},
-		&e{Message: "Yello"}, &e{Message: "Jello"}, &e{Message: "Mello"},
-		&e{Message: "Yello"}, &e{Message: "Jello"}, &e{Message: "Mello"})
+	err = bf.PublishRaw("test-topic", &e{Message: "Yello"})
 
 	err = h.handleEvent()
 	assert.Nil(t, err)
@@ -102,12 +100,14 @@ type eventHandler struct {
 
 func (e *eventHandler) handleEvent() error {
 	return e.bf.Subscribe("test-topic", func(event platform.Event) {
-		type e struct {
+		log.Println("handling event...")
+		type E struct {
 			Message string `json:"message"`
 		}
-		value := &e{}
+		value := &E{}
 		d, err := event.Parse(value)
 		log.Println(err)
 		log.Println(d)
+		log.Println(value.Message)
 	})
 }

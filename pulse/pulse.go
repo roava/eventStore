@@ -122,7 +122,7 @@ func (s *pulsarStore) Subscribe(topic string, handler bifrost.SubscriptionHandle
 					// consumer in platform can be nil, we don't use it because we don't ack test event
 					ev := platform.NewEvent(platform.NewPlatformMessage(pulsar.LatestMessageID(), topic,
 						msg), nil)
-					go handler(ev)
+					handler(ev)
 				}
 			default:
 				return nil
