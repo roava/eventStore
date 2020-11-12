@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -27,7 +28,8 @@ type pulsarStore struct {
 
 	// the below values are only useful for testing
 	testMode bool
-	ch       chan []byte
+	consumers map[string]chan []byte
+	mtx sync.Mutex
 }
 
 func Init(opts bifrost.Options) (bifrost.EventStore, error) {
@@ -66,7 +68,7 @@ func Init(opts bifrost.Options) (bifrost.EventStore, error) {
 
 func InitTestEventStore(serviceName string, logger *logrus.Logger) (bifrost.EventStore, error) {
 	return &pulsarStore{serviceName: serviceName, testMode: true,
-		ch: make(chan []byte, 1), logger: logger}, nil
+		consumers: map[string]chan []byte{}, logger: logger}, nil
 }
 
 func (s *pulsarStore) GetServiceName() string {
@@ -75,8 +77,23 @@ func (s *pulsarStore) GetServiceName() string {
 
 func (s *pulsarStore) Publish(topic string, message []byte) error {
 	if s.testMode {
-		s.logger.Info("pushing message into test channel")
-		s.ch <- message
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second * 5)
+		defer cancel()
+		loop:
+			for {
+				select {
+				case <-ctx.Done():
+					break loop
+				default:
+					s.mtx.Lock()
+					ch, ok := s.consumers[topic]
+					s.mtx.Unlock()
+					if ok {
+						ch <- message
+						break loop
+					}
+				}
+			}
 		return nil
 	}
 	// sn here is the topic root prefix eg: is: io.roava.kyc
@@ -114,9 +131,12 @@ func (s *pulsarStore) Publish(topic string, message []byte) error {
 
 func (s *pulsarStore) Subscribe(topic string, handler bifrost.SubscriptionHandler) error {
 	if s.testMode {
+		s.mtx.Lock()
+		ch := s.consumers[topic]
+		s.mtx.Unlock()
 		for {
 			select {
-			case msg, ok := <-s.ch:
+			case msg, ok := <-ch:
 				if ok {
 					s.logger.WithField("data", string(msg)).Info("recv message in test mode")
 					// consumer in platform can be nil, we don't use it because we don't ack test event
@@ -180,7 +200,9 @@ func (s *pulsarStore) PublishRaw(topic string, messages ...interface{}) error {
 		return errors.New("invalid message size")
 	}
 	if s.testMode {
-		s.ch = make(chan []byte, len(messages))
+		s.mtx.Lock()
+		s.consumers[topic] = make(chan []byte, len(messages))
+		s.mtx.Unlock()
 	}
 	for idx, message := range messages {
 		data, err := json.Marshal(message)

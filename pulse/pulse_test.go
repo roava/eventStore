@@ -87,8 +87,10 @@ func TestIntegration(t *testing.T) {
 	type e struct {
 		Message string `json:"message"`
 	}
+	value := &e{Message: "Yello"}
+	ev := events.New().WithSource("test").WithData(value)
 	h := &eventHandler{bf: bf}
-	err = bf.PublishRaw("test-topic", &e{Message: "Yello"})
+	err = bf.PublishRaw("test-topic", ev)
 
 	err = h.handleEvent()
 	assert.Nil(t, err)
