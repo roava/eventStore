@@ -1,6 +1,9 @@
 package events
 
-import "time"
+import (
+	"github.com/roava/bifrost/idgenerator"
+	"time"
+)
 
 type Event struct {
 	SpecVersion string      `json:"spec_version"`
@@ -12,8 +15,12 @@ type Event struct {
 	Data        interface{} `json:"data"`
 }
 
+var (
+	contentTypeJson = "application/json"
+)
+
 func New() *Event {
-	return &Event{}
+	return &Event{Id: idgenerator.New().Generate(), Time: time.Now(), ContentType: contentTypeJson}
 }
 
 func (e *Event) WithSpecVersion(specVersion string) *Event {
