@@ -4,7 +4,9 @@ go 1.14
 
 require (
 	github.com/apache/pulsar-client-go v0.2.0
-	github.com/google/uuid v1.1.2 // indirect
+	github.com/oklog/ulid/v2 v2.0.2
+	github.com/ory/dockertest/v3 v3.6.2
 	github.com/pkg/errors v0.9.1
+	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.4.0
 )

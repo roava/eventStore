@@ -5,4 +5,5 @@ type Options struct {
 	Address             string
 	CertContent         string
 	AuthenticationToken string
+	Debug               bool
 }
