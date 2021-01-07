@@ -9,7 +9,7 @@ import (
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/roava/bifrost"
 	"github.com/roava/bifrost/platform"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -23,13 +23,13 @@ type pulsarStore struct {
 	serviceName string
 	client      pulsar.Client
 	opts        bifrost.Options
-	logger      *logrus.Logger
+	logger      *zap.Logger
 	debug       bool
 
 	// the below values are only useful for testing
-	testMode bool
+	testMode  bool
 	consumers map[string]chan []byte
-	mtx sync.Mutex
+	mtx       sync.Mutex
 }
 
 func Init(opts bifrost.Options) (bifrost.EventStore, error) {
@@ -61,12 +61,11 @@ func Init(opts bifrost.Options) (bifrost.EventStore, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to Pulsar with provided configuration. failed with error: %v", err)
 	}
-	lg := logrus.New()
-	lg.SetFormatter(&logrus.JSONFormatter{})
-	return &pulsarStore{client: p, serviceName: name, logger: lg, testMode: false, debug: opts.Debug}, nil
+	logger, _ := zap.NewProduction()
+	return &pulsarStore{client: p, serviceName: name, logger: logger, testMode: false, debug: opts.Debug}, nil
 }
 
-func InitTestEventStore(serviceName string, logger *logrus.Logger) (bifrost.EventStore, error) {
+func InitTestEventStore(serviceName string, logger *zap.Logger) (bifrost.EventStore, error) {
 	return &pulsarStore{serviceName: serviceName, testMode: true,
 		consumers: map[string]chan []byte{}, logger: logger}, nil
 }
@@ -77,23 +76,23 @@ func (s *pulsarStore) GetServiceName() string {
 
 func (s *pulsarStore) Publish(topic string, message []byte) error {
 	if s.testMode {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second * 5)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
-		loop:
-			for {
-				select {
-				case <-ctx.Done():
+	loop:
+		for {
+			select {
+			case <-ctx.Done():
+				break loop
+			default:
+				s.mtx.Lock()
+				ch, ok := s.consumers[topic]
+				s.mtx.Unlock()
+				if ok {
+					ch <- message
 					break loop
-				default:
-					s.mtx.Lock()
-					ch, ok := s.consumers[topic]
-					s.mtx.Unlock()
-					if ok {
-						ch <- message
-						break loop
-					}
 				}
 			}
+		}
 		return nil
 	}
 	// sn here is the topic root prefix eg: is: io.roava.kyc
@@ -121,10 +120,9 @@ func (s *pulsarStore) Publish(topic string, message []byte) error {
 		return fmt.Errorf("failed to send message. %v", err)
 	}
 	if s.debug {
-		s.logger.WithFields(logrus.Fields{
-			"topic":          topic,
-			"message_hex_id": byteToHex(id.Serialize()),
-		}).Info("message published")
+		s.logger.With(zap.String(
+			"topic", topic),
+			zap.String("message_hex_id", byteToHex(id.Serialize()))).Info("message published")
 	}
 	return nil
 }
@@ -138,7 +136,9 @@ func (s *pulsarStore) Subscribe(topic string, handler bifrost.SubscriptionHandle
 			select {
 			case msg, ok := <-ch:
 				if ok {
-					s.logger.WithField("data", string(msg)).Info("recv message in test mode")
+					if s.debug {
+						s.logger.With(zap.String("data", string(msg))).Info("recv message in test mode")
+					}
 					// consumer in platform can be nil, we don't use it because we don't ack test event
 					ev := platform.NewEvent(platform.NewPlatformMessage(pulsar.LatestMessageID(), topic,
 						msg), nil)
@@ -171,10 +171,9 @@ func (s *pulsarStore) Subscribe(topic string, handler bifrost.SubscriptionHandle
 				return bifrost.ErrCloseConn
 			}
 			if s.debug {
-				s.logger.WithFields(logrus.Fields{
-					"data":  string(cm.Payload()),
-					"topic": cm.Topic(),
-				}).Info("new event received")
+				s.logger.With(zap.String(
+					"data", string(cm.Payload())),
+					zap.String("topic", cm.Topic())).Info("new event received")
 			}
 			event := platform.NewEvent(cm, cm)
 			go handler(event)
@@ -210,7 +209,7 @@ func (s *pulsarStore) PublishRaw(topic string, messages ...interface{}) error {
 			return err
 		}
 		if s.debug {
-			s.logger.WithField("index", idx).Info("publishing message")
+			s.logger.With(zap.Int("index", idx)).Info("publishing message")
 		}
 		err = s.Publish(topic, data)
 		if err != nil {

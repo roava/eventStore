@@ -5,8 +5,8 @@ import (
 	"github.com/roava/bifrost"
 	"github.com/roava/bifrost/events"
 	"github.com/roava/bifrost/platform"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 	"log"
 	"testing"
 	"time"
@@ -53,7 +53,9 @@ func TestInit(t *testing.T) {
 
 func TestPulsarStore_Run(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	store, _ := InitTestEventStore("nil", logrus.StandardLogger())
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+	store, _ := InitTestEventStore("nil", logger)
 
 	now := time.Now()
 	// cancel after 3secs
@@ -79,7 +81,8 @@ func Test_generateRandomName(t *testing.T) {
 }
 
 func TestIntegration(t *testing.T) {
-	logger := logrus.StandardLogger()
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
 	bf, err := InitTestEventStore("test-event-store", logger)
 	assert.Nil(t, err)
 	assert.NotNil(t, bf)
