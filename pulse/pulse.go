@@ -154,8 +154,8 @@ func (s *pulsarStore) Subscribe(topic string, handler bifrost.SubscriptionHandle
 	consumer, err := s.client.Subscribe(pulsar.ConsumerOptions{
 		Topic:                       topic,
 		AutoDiscoveryPeriod:         0,
-		SubscriptionName:            fmt.Sprintf("subscription-%s", generateRandomName()),
-		Type:                        pulsar.Exclusive,
+		SubscriptionName:            fmt.Sprintf("%s-%s", serviceName, topic),
+		Type:                        pulsar.Shared,
 		SubscriptionInitialPosition: pulsar.SubscriptionPositionLatest,
 		Name:                        serviceName,
 	})
