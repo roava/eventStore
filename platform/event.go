@@ -25,6 +25,7 @@ type Data struct {
 
 type Event interface {
 	Ack()
+	NAck()
 	Parse(value interface{}) (*Data, error)
 	Topic() string
 }
@@ -38,6 +39,13 @@ func (p *platformEvent) Ack() {
 		return
 	}
 	p.consumer.AckID(p.message.ID())
+}
+
+func (p *platformEvent) NAck() {
+	if p.consumer == nil || p.message == nil {
+		return
+	}
+	p.consumer.NackID(p.message.ID())
 }
 
 func (p *platformEvent) Parse(value interface{}) (*Data, error) {
