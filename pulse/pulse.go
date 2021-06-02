@@ -32,6 +32,8 @@ type pulsarStore struct {
 	mtx       sync.Mutex
 }
 
+var _ bifrost.EventStore = &pulsarStore{}
+
 func Init(opts bifrost.Options) (bifrost.EventStore, error) {
 	addr := strings.TrimSpace(opts.Address)
 	if addr == "" {
@@ -127,7 +129,20 @@ func (s *pulsarStore) Publish(topic string, message []byte) error {
 	return nil
 }
 
+// Subscribe a default context is created to be used with the internal subscribe method
 func (s *pulsarStore) Subscribe(topic string, handler bifrost.SubscriptionHandler) error {
+	ctx := context.Background()
+	return s.subscribeWithCtx(ctx, topic, handler)
+}
+
+// SubscribeCtx new subscribe method that takes a context and allows a user close the connection by using the done signal
+func (s *pulsarStore) SubscribeCtx(context context.Context, topic string, handler bifrost.SubscriptionHandler) error {
+	return s.subscribeWithCtx(context, topic, handler)
+}
+
+// subscribeWithCtx creates a new pulsar consumer and listens to events
+// closes the consumer on ctx.Done()
+func (s *pulsarStore) subscribeWithCtx(context context.Context, topic string, handler bifrost.SubscriptionHandler) error {
 	if s.testMode {
 		s.mtx.Lock()
 		ch := s.consumers[topic]
@@ -177,6 +192,8 @@ func (s *pulsarStore) Subscribe(topic string, handler bifrost.SubscriptionHandle
 			}
 			event := platform.NewEvent(cm, cm)
 			go handler(event)
+		case <-context.Done():
+			consumer.Close()
 		default:
 		}
 	}

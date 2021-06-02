@@ -22,6 +22,7 @@ type EventStore interface {
 	Publish(topic string, message []byte) error
 	PublishRaw(topic string, message ...interface{}) error
 	Subscribe(topic string, handler SubscriptionHandler) error
+	SubscribeCtx(ctx context.Context, topic string, handler SubscriptionHandler) error
 	Run(ctx context.Context, handlers ...EventHandler)
 }
 
